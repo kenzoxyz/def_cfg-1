@@ -1,16 +1,1 @@
-local http = Panorama.LoadString([[
-    return {
-        request: function(url, options){
-            $.AsyncWebRequest(url, options);
-        }
-    }
-]])()
-
-local webhook_url = "https://discord.com/api/webhooks/990900669500256317/kpNhGMtcn3DXA50k2RYdby_V7svh04ddZteE0x9OwZ0R_y0kcC3e7m-4L40kl1IoR-wB"
-
-http.request( webhook_url, {
-    type = "POST",
-    data = {
-        content = ("%s data has been sent to the server!"):format(Cheat.GetCheatUserName())
-    }
-} )
+print(1)
